@@ -7,14 +7,14 @@ import retrofit2.Response;
 import utils.RetrofitUtils;
 
 import java.io.IOException;
+import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
-public class CategoryServiceTest {
+public class CategoryServiceTest extends AbstractTest {
 
     static CategoryService categoryService;
-    final static String PRODUCT_CATEGORY = "Food";
     final static int CATEGORY_ID = 1;
 
     @BeforeAll
@@ -25,10 +25,13 @@ public class CategoryServiceTest {
     @Test
     void getCategoryByIdPositiveTest() throws IOException {
         Response<Category> response = categoryService.getCategory(CATEGORY_ID).execute();
-
         assertThat(response.isSuccessful(), CoreMatchers.is(true));
         assertThat(response.body().getId(), equalTo(CATEGORY_ID));
-        assertThat(response.body().getTitle(), equalTo(PRODUCT_CATEGORY));
-        response.body().getProducts().forEach(product -> assertThat(product.getCategoryTitle(), equalTo(PRODUCT_CATEGORY)));
+
+        getCategoriesModel().createCriteria().andIdEqualTo(Long.valueOf(CATEGORY_ID));
+        List<model.Categories> list = getCategoriesMapper().selectByExample(getCategoriesModel());
+        assertThat(list.size(), equalTo(1));
+        assertThat(response.body().getTitle(), equalTo(list.get(0).getTitle()));
+        response.body().getProducts().forEach(product -> assertThat(product.getCategoryTitle(), equalTo(list.get(0).getTitle())));
     }
 }

@@ -22,7 +22,9 @@
         <junit-jupiter.version>5.9.0</junit-jupiter.version>
         <login-interceptor.version>4.10.0</login-interceptor.version>
         <hamcrest.version>2.2</hamcrest.version>
-        <java-faker.version>0.15</java-faker.version>
+        <java-faker.version>1.0.2</java-faker.version>
+        <postgres.version>42.5.1</postgres.version>
+        <mybatis.version>3.5.11</mybatis.version>
     </properties>
 
     <dependencies>
@@ -100,6 +102,50 @@
             <version>${java-faker.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${postgres.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mybatis</groupId>
+            <artifactId>mybatis</artifactId>
+            <version>${mybatis.version}</version>
+        </dependency>
+
     </dependencies>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.mybatis.generator</groupId>
+                <artifactId>mybatis-generator-maven-plugin</artifactId>
+                <version>1.4.0</version>
+                <executions>
+                    <execution>
+                        <id>Generate MyBatis Artifacts</id>
+                        <goals>
+                            <!-- disabled generation mybatis db provider-->
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+        <resources>
+            <resource>
+                <directory>src/main/java</directory>
+                <includes>
+                    <include>**/*.xml</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <includes>
+                    <include>**/*.xml</include>
+                </includes>
+            </resource>
+        </resources>
+    </build>
 </project>

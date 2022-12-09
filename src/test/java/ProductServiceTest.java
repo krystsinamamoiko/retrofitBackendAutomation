@@ -1,22 +1,25 @@
 import api.ProductService;
 import com.github.javafaker.Faker;
 import dto.Product;
+import model.Products;
 import okhttp3.ResponseBody;
-import org.hamcrest.CoreMatchers;
-import org.hamcrest.Matchers;
 import org.junit.jupiter.api.*;
 import retrofit2.Response;
 import utils.RetrofitUtils;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
 
-public class ProductServiceTest {
+public class ProductServiceTest extends AbstractTest {
 
     final static String PRODUCT_CATEGORY = "Food";
+    final static long PRODUCT_CATEGORY_ID = 1L;
     static ProductService productService;
+
     Product product = null;
     Faker faker = new Faker();
     int productId = 0;
@@ -35,34 +38,27 @@ public class ProductServiceTest {
     }
 
     @Test
-    @DisplayName("Verify a new product creation")
+    @DisplayName("Verify create a new product endpoint")
     void testCreateProduct() throws IOException {
         Response<Product> response = productService.createProduct(product).execute();
-        assertThat(response.isSuccessful(), CoreMatchers.is(true));
-        assertThat(response.body().getTitle(), CoreMatchers.is(product.getTitle()));
-        assertThat(response.body().getPrice(), CoreMatchers.is(product.getPrice()));
-        assertThat(response.body().getCategoryTitle(), CoreMatchers.is(product.getCategoryTitle()));
+        assertThat(response.isSuccessful(), equalTo(true));
+        assertThat(response.body().getTitle(), equalTo(product.getTitle()));
+        assertThat(response.body().getPrice(), equalTo(product.getPrice()));
+        assertThat(response.body().getCategoryTitle(), equalTo(product.getCategoryTitle()));
         productId = response.body().getId();
 
-        boolean isProductInList = false;
-        Response<List<Product>> responseList = productService.getProducts().execute();
-
-        for(Product item : responseList.body()) {
-            if(item.getId().equals(productId) &&
-               item.getTitle().equals(product.getTitle()) &&
-               item.getCategoryTitle().equals(product.getCategoryTitle()) &&
-               item.getPrice().equals(product.getPrice()) ) {
-                isProductInList = true;
-                break;
-            }
-        }
-        assertThat(isProductInList, CoreMatchers.is(true));
+        model.Products dbProduct = getProductByIdViaDatabase(productId);
+        assertThat(dbProduct, notNullValue());
+        assertThat(response.body().getTitle(), equalTo(dbProduct.getTitle()));
+        assertThat(response.body().getPrice(), equalTo(dbProduct.getPrice()));
+        model.Categories dbCategory = getCategoryByIdViaDatabase(dbProduct.getCategoryId());
+        assertThat(response.body().getCategoryTitle(), equalTo(dbCategory.getTitle()));
     }
 
     @Test
-    @DisplayName("Verify a product modification")
+    @DisplayName("Verify modify the given product endpoint")
     void testModifyProduct() throws IOException {
-        createProduct(product);
+        productId = (int) createProductViaDatabase();
 
         // modify product properties
         product.setId(productId);
@@ -70,54 +66,117 @@ public class ProductServiceTest {
         product.setTitle(faker.food().ingredient());
 
         Response<Product> responseModify = productService.modifyProduct(product).execute();
-        assertThat(responseModify.isSuccessful(), CoreMatchers.is(true));
-        assertThat(responseModify.body().getTitle(), CoreMatchers.is(product.getTitle()));
-        assertThat(responseModify.body().getPrice(), CoreMatchers.is(product.getPrice()));
-        assertThat(responseModify.body().getCategoryTitle(), CoreMatchers.is(product.getCategoryTitle()));
-        assertThat(responseModify.body().getId(), CoreMatchers.is(productId));
+        assertThat(responseModify.isSuccessful(), equalTo(true));
+        assertThat(responseModify.body().getTitle(), equalTo(product.getTitle()));
+        assertThat(responseModify.body().getPrice(), equalTo(product.getPrice()));
+        assertThat(responseModify.body().getCategoryTitle(), equalTo(product.getCategoryTitle()));
+        assertThat(responseModify.body().getId(), equalTo(productId));
 
-        Response<Product> response = productService.getProductById(productId).execute();
-        assertThat(response.isSuccessful(), CoreMatchers.is(true));
-        assertThat(response.body().getTitle(), CoreMatchers.is(product.getTitle()));
-        assertThat(response.body().getPrice(), CoreMatchers.is(product.getPrice()));
-        assertThat(response.body().getCategoryTitle(), CoreMatchers.is(product.getCategoryTitle()));
+        model.Products dbProduct = getProductByIdViaDatabase(productId);
+        assertThat(dbProduct, notNullValue());
+        assertThat(responseModify.body().getTitle(), equalTo(dbProduct.getTitle()));
+        assertThat(responseModify.body().getPrice(), equalTo(dbProduct.getPrice()));
+        model.Categories dbCategory = getCategoryByIdViaDatabase(dbProduct.getCategoryId());
+        assertThat(responseModify.body().getCategoryTitle(), equalTo(dbCategory.getTitle()));
     }
 
     @Test
-    @DisplayName("Verify product list get")
+    @DisplayName("Verify get product list endpoint")
     void testProductListGet() throws IOException {
-        createProduct(product);
-
         Response<List<Product>> responseList = productService.getProducts().execute();
-        assertThat(responseList.isSuccessful(), CoreMatchers.is(true));
-        assertThat(responseList.body().size(), Matchers.greaterThan(0));
+        assertThat(responseList.isSuccessful(), equalTo(true));
+
+        getProductsModel().clear();
+        List<model.Products> productList = getProductsMapper().selectByExample(getProductsModel());
+
+        assertThat(responseList.body().size(), equalTo(productList.size()));
+        List<String> titlesDB = productList.stream().map(s -> s.getTitle()).sorted().collect(Collectors.toList());
+        List<String> titlesAPI = responseList.body().stream().map(s -> s.getTitle()).sorted().collect(Collectors.toList());
+        assertThat(titlesDB, equalTo(titlesAPI));
     }
 
     @Test
-    @DisplayName("Verify a product get by id")
+    @DisplayName("Verify get the given product by id endpoint")
     void testProductGetById() throws IOException {
-        createProduct(product);
+        productId = (int) createProductViaDatabase();
         product.setId(productId);
 
         Response<Product> response = productService.getProductById(productId).execute();
-        assertThat(response.isSuccessful(), CoreMatchers.is(true));
-        assertThat(response.body().getTitle(), CoreMatchers.is(product.getTitle()));
-        assertThat(response.body().getPrice(), CoreMatchers.is(product.getPrice()));
-        assertThat(response.body().getCategoryTitle(), CoreMatchers.is(product.getCategoryTitle()));
+        assertThat(response.isSuccessful(), equalTo(true));
+        assertThat(response.body().getId(), equalTo(product.getId()));
+        assertThat(response.body().getTitle(), equalTo(product.getTitle()));
+        assertThat(response.body().getPrice(), equalTo(product.getPrice()));
+        assertThat(response.body().getCategoryTitle(), equalTo(product.getCategoryTitle()));
+
+        model.Products dbProduct = getProductByIdViaDatabase(productId);
+        assertThat(dbProduct, notNullValue());
+        assertThat(response.body().getTitle(), equalTo(dbProduct.getTitle()));
+        assertThat(response.body().getPrice(), equalTo(dbProduct.getPrice()));
+        model.Categories dbCategory = getCategoryByIdViaDatabase(dbProduct.getCategoryId());
+        assertThat(response.body().getCategoryTitle(), equalTo(dbCategory.getTitle()));
+    }
+
+    @Test
+    @DisplayName("Verify delete the given product endpoint")
+    void testDeleteProduct() throws IOException {
+        productId = (int) createProductViaDatabase();
+
+        Response<ResponseBody> response = productService.deleteProduct(productId).execute();
+        assertThat(response.isSuccessful(), equalTo(true));
+
+        model.Products dbProduct = getProductByIdViaDatabase(productId);
+        assertThat(dbProduct, nullValue());
+        productId = 0;
     }
 
     @AfterEach
-    void tearDown() throws IOException {
+    void tearDown() {
         if (productId != 0) {
-            Response<ResponseBody> response = productService.deleteProduct(productId).execute();
-            assertThat(response.isSuccessful(), CoreMatchers.is(true));
+            getProductsModel().clear();
+            getProductsModel().createCriteria().andIdEqualTo(Long.valueOf(productId));
+            getProductsMapper().deleteByExample(getProductsModel());
+            getSession().commit();
         }
     }
 
-    private void createProduct(Product product) throws IOException {
-        Response<Product> responseCreate = productService.createProduct(product).execute();
-        assertThat(responseCreate.isSuccessful(), CoreMatchers.is(true));
-        assertThat(responseCreate.body().getId(), CoreMatchers.notNullValue());
-        productId = responseCreate.body().getId();
+    private long createProductViaDatabase() {
+        model.Products products = new Products();
+        products.setPrice(product.getPrice());
+        products.setTitle(product.getTitle());
+        products.setCategoryId(PRODUCT_CATEGORY_ID);
+        getProductsMapper().insert(products);
+        getSession().commit();
+
+        getProductsModel().clear();
+        getProductsModel()
+            .createCriteria()
+            .andTitleEqualTo(products.getTitle())
+            .andCategoryIdEqualTo(PRODUCT_CATEGORY_ID)
+            .andPriceEqualTo(products.getPrice());
+        List<Products> productList = getProductsMapper().selectByExample(getProductsModel());
+
+        if(productList.size() >= 1) {
+            return productList.get(0).getId();
+        } else {
+            return 0;
+        }
+    }
+
+    private model.Products getProductByIdViaDatabase(long id) {
+        getProductsModel().clear();
+        getProductsModel().createCriteria().andIdEqualTo(id);
+        List<model.Products> productList = getProductsMapper().selectByExample(getProductsModel());
+        if(productList.size() >= 1) {
+            return productList.get(0);
+        } else {
+            return null;
+        }
+    }
+
+    private model.Categories getCategoryByIdViaDatabase(long id) {
+        getCategoriesModel().createCriteria().andIdEqualTo(id);
+        List<model.Categories> categoryList = getCategoriesMapper().selectByExample(getCategoriesModel());
+        assertThat("Category is not found!", categoryList.size(), equalTo(1));
+        return categoryList.get(0);
     }
 }
